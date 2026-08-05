@@ -1,0 +1,13 @@
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: checkout-staging
+spec:
+  owner:
+    team: checkout
+    contact: "#team-checkout"
+  tier: staging
+  resources:
+    cpu: "8"
+    memory: 16Gi
+    pods: 30
