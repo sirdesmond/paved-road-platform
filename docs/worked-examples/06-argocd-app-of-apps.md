@@ -214,6 +214,7 @@ An `Environment` reconciled by a controller that you never deployed by hand.
 | What you see | Usually means |
 |---|---|
 | `ErrImagePull` / `ImagePullBackOff` | Image not loaded into kind, or `imagePullPolicy` isn't `IfNotPresent`. Check with `docker exec -it platform-dev-control-plane crictl images \| grep environment`. |
+| `docker-build` fails with `package cmd/main.go is not in std` | Empty build context from the scaffold's `**`-style `.dockerignore` on the classic builder. See [runbook 0002](../runbooks/0002-empty-docker-build-context.md). |
 | App stuck `OutOfSync`, no error | Open the UI. It shows the exact resource and diff blocking the sync, which the CLI makes you work for. |
 | `metadata.annotations: Too long` | Missing `ServerSideApply=true` on an app with big CRDs. |
 | `ComparisonError: repository not found` | Wrong `repoURL`, or the repo is private and Argo CD has no credentials. |

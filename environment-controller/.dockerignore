@@ -1,11 +1,23 @@
 # More info: https://docs.docker.com/engine/reference/builder/#dockerignore-file
-# Ignore everything by default and re-include only needed files
-**
+#
+# Deliberately an exclude list rather than the "ignore ** then re-include" style
+# the scaffold ships with. That style relies on the builder descending into
+# excluded directories to evaluate ! exceptions, which BuildKit does and the
+# classic builder does not — so with the classic builder you get an empty
+# context and a confusing "package cmd/main.go is not in std" at build time.
 
-# Re-include Go source files (but not *_test.go)
-!**/*.go
-**/*_test.go
+# Build output and local tooling
+bin/
+dist/
+cover.out
 
-# Re-include Go module files
-!go.mod
-!go.sum
+# VCS and editor noise
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Not needed to build the manager
+test/e2e/
+*.md
