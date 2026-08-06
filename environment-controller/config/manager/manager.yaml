@@ -65,6 +65,10 @@ spec:
           - --health-probe-bind-address=:8081
         image: controller:latest
         name: manager
+        # The image is side-loaded into kind, not pullable from a registry.
+        # Without this, a mutable tag defaults to Always and the pod sits in
+        # ErrImagePull forever.
+        imagePullPolicy: IfNotPresent
         env:
         - name: POD_NAMESPACE
           valueFrom:

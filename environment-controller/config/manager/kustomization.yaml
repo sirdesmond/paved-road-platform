@@ -6,4 +6,3 @@ images:
 - name: controller
   newName: environment-controller
   newTag: dev
-  imagePullPolicy: IfNotPresent
