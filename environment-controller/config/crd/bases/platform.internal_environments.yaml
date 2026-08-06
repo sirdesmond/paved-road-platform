@@ -32,6 +32,9 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - jsonPath: .status.expiresAt
+      name: Expires
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -80,18 +83,18 @@ spec:
                 - team
                 type: object
               resources:
-                default: {}
                 description: |-
-                  Resources overrides the tier's default ceiling.
-                  The empty-object default is load-bearing: without it, omitting `resources`
-                  means the API server never descends into this object, so none of the
-                  per-field defaults (cpu, memory, pods) apply.
+                  Resources overrides the tier's default ceiling, field by field.
+                  Deliberately no schema default: the API server would fill it in before
+                  the controller ever saw the object, and we'd lose the ability to tell
+                  "team didn't say" from "team asked for exactly this". Tier defaults are
+                  logic, so they live in the controller. See status.effectiveResources for
+                  what was actually applied.
                 properties:
                   cpu:
                     anyOf:
                     - type: integer
                     - type: string
-                    default: "4"
                     description: CPU is the total CPU the namespace may request, e.g.
                       "4" or "500m".
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
@@ -100,13 +103,11 @@ spec:
                     anyOf:
                     - type: integer
                     - type: string
-                    default: 8Gi
                     description: Memory is the total memory the namespace may request,
                       e.g. "8Gi".
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                   pods:
-                    default: 20
                     description: Pods is the maximum number of pods in the namespace.
                     format: int32
                     maximum: 200
@@ -114,17 +115,27 @@ spec:
                     type: integer
                 type: object
               tier:
-                description: 'Tier drives the defaults: quotas, rollout strategy,
-                  whether merges are automatic.'
                 enum:
                 - dev
                 - staging
                 - prod
                 type: string
+                x-kubernetes-validations:
+                - message: 'tier is immutable: create a new environment at the target
+                    tier and migrate to it'
+                  rule: self == oldSelf
+              ttl:
+                description: TTL is how long a non-prod environment lives before it's
+                  reaped.
+                type: string
             required:
             - owner
             - tier
             type: object
+            x-kubernetes-validations:
+            - message: 'production environments do not expire: remove ttl, or use
+                tier staging if you want it reaped'
+              rule: self.tier != 'prod' || !has(self.ttl)
           status:
             description: EnvironmentStatus is written by the controller, never by
               a user.
@@ -189,6 +200,39 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              effectiveResources:
+                description: |-
+                  EffectiveResources is the ceiling actually applied, after tier defaults
+                  and any overrides. This is what the quota was built from.
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: CPU is the total CPU the namespace may request, e.g.
+                      "4" or "500m".
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Memory is the total memory the namespace may request,
+                      e.g. "8Gi".
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  pods:
+                    description: Pods is the maximum number of pods in the namespace.
+                    format: int32
+                    maximum: 200
+                    minimum: 1
+                    type: integer
+                type: object
+              expiresAt:
+                description: ExpiresAt is when this environment becomes eligible for
+                  reaping.
+                format: date-time
+                type: string
               namespace:
                 description: Namespace is the namespace provisioned for this environment.
                 type: string

@@ -62,6 +62,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	var registryNamespace string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -79,6 +80,8 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&registryNamespace, "registry-namespace", "",
+		"Namespace holding the shared environment index. Defaults to the controller's own namespace.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -87,6 +90,15 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Fall back to the namespace we're running in, so the controller follows
+	// its deployment rather than assuming a fixed layout.
+	if registryNamespace == "" {
+		registryNamespace = os.Getenv("POD_NAMESPACE")
+	}
+	if registryNamespace == "" {
+		setupLog.Error(nil, "registry namespace not set; pass --registry-namespace or set POD_NAMESPACE")
+		os.Exit(1)
+	}
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -179,8 +191,9 @@ func main() {
 	}
 
 	if err := (&controller.EnvironmentReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		RegistryNamespace: registryNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "environment")
 		os.Exit(1)
