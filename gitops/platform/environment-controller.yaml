@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: environment-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/sirdesmond/paved-road-platform.git
+    targetRevision: main
+    # Argo CD detects kustomization.yaml and renders it, so this is the same
+    # thing `make deploy` would have applied — just from Git instead of a laptop.
+    path: environment-controller/config/default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: environment-controller-system
+  syncPolicy:
+    automated:
+      prune: true      # delete from Git means delete from the cluster
+      selfHeal: true   # hand edits get reverted
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # your CRD has a large schema; same reason as above
