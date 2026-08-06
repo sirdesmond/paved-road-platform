@@ -368,7 +368,11 @@ value like `"7 days"` is rejected by the API server rather than accepted.
 
 ## Before you move on
 
-Write two or three sentences in `docs/adr/` on why the resource is cluster-scoped. You'll be asked, and
-writing it now while the reasoning is fresh is the habit this whole repo is trying to build.
+Write down why the resource is cluster-scoped while the reasoning is fresh. You'll be asked about it, and
+recording decisions as you make them is the habit this whole repo is trying to build.
+
+Worked version: [ADR-0005](../adr/0005-environment-is-cluster-scoped.md). Try writing yours before reading
+it — the interesting part isn't the decision, it's spotting that the RBAC you give up is a real cost rather
+than an afterthought.
 
 Next: [02 — the reconciler](./02-reconciler.md), where this CRD starts actually making things.

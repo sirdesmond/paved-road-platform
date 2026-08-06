@@ -8,7 +8,7 @@
 | What the role asks for | Where this project demonstrates it | Honest status |
 |---|---|---|
 | Turn ambiguous infra problems into proposals, drive via RFCs | [RFC-0001](./rfc/0001-self-service-environments.md), ADR-0001/0002 | ✅ written — strongest artifact |
-| Self-service capabilities + platform APIs **in Go** | `platform-api`, `environment-controller`, `platformctl` (Phase 2) | ⚠️ designed, not built — **highest priority to build** |
+| Self-service capabilities + platform APIs **in Go** | `platform-api`, `environment-controller`, `platformctl` (Phase 2) | 🔨 `environment-controller` built: CRD, reconciler, ownership, derived status. `platform-api` and CLI still to do |
 | Delivery standards: Terraform, GitOps/Argo CD, progressive rollout, testing, CD | Phases 0–1 | ⚠️ partially proven (GitOps loop works in sibling repo) |
 | Multi-tenant EKS: reliability, security, scale, cost | Phase 0 + tenancy model in ARCHITECTURE §3 | ⚠️ designed |
 | Envoy Gateway ingress, traffic routing | Phase 3, [ADR-0002](./adr/0002-envoy-gateway-for-ingress.md) | ⚠️ decided, not built |
@@ -34,6 +34,78 @@
 - **Adoption as the real metric.** "If teams don't use the paved road, the paved road is wrong" — and how you'd instrument it from day one.
 - **Why no portal and no Crossplane in v1** ([ADR-0003](./adr/0003-no-portal-or-crossplane-in-v1.md)). Strong Staff answer: a portal decorates a provisioning bottleneck rather than removing it, and environment provisioning is procedural logic that belongs in testable Go. Then name the revisit triggers — that's what separates "I scoped this" from "I didn't get to it." If asked whether you know them, point at the sibling repo where you ran Crossplane v2 and debugged real CRD failures.
 - **A real debugging story.** The Kyverno CRD annotation-size incident from the sibling repo: symptom (controller crashloop), false leads (assumed a missing chart), the tell (only the largest CRDs missing → size limit, not rendering), fix (server-side apply), prevention (default SSA for CRD-bearing charts). Staff interviews want the reasoning, including the wrong turns.
+
+## Controller questions, worked through
+
+From the reflection section of [worked example 02](./worked-examples/02-reconciler.md). These come up in
+almost every platform interview that touches Kubernetes, usually phrased differently.
+
+### The controller died halfway through creating three objects. What happens?
+
+The process restarts, the manager's informers list every `Environment` on startup and enqueue them, and
+reconcile runs from the top. The namespace already exists, so `CreateOrUpdate` fetches it, the mutate function
+produces no diff, and nothing is written. Same for the quota. The missing network policy gets created.
+
+It's fine because every step is idempotent and reconcile is a convergence function, not a transaction. There's
+no partial state to clean up and nothing to roll back to, because "correct" is defined by the spec rather than
+by how far through a sequence you got. It's also exactly why a plain `Create` would be wrong — it fails on the
+second pass with `AlreadyExists`.
+
+Follow-up worth volunteering: between the crash and the next reconcile, status is stale. That's what
+`observedGeneration` is for — it distinguishes "this status describes the current spec" from "this status
+predates your change".
+
+### Someone hand-edits the quota to give themselves more CPU. How long does it last?
+
+About a second.
+
+`Owns(&corev1.ResourceQuota{})` sets up a watch with an owner-mapping handler: any event on a quota maps back
+to the `Environment` in its controller ownerReference, that Environment is enqueued, and reconcile overwrites
+`spec.hard`. It only works because the owner reference is set — without it the event maps to nothing and the
+edit sticks.
+
+Two bits of nuance that show you've actually run one of these. Anything the reconciler *doesn't* set (an
+annotation, say) survives, because the mutate function only writes fields it owns. And even with no watch, the
+manager's resync — 10 hours by default — would eventually catch it.
+
+The operational point: self-healing means someone's change vanishes with no explanation, which is baffling if
+they don't know the platform works this way. An argument for restricting direct cluster access *after* the
+paved road is faster, not before.
+
+### Why doesn't a namespace stuck in Terminating mean your controller is broken?
+
+Because that phase isn't yours. Namespace deletion is two-phase, and the second phase belongs to the namespace
+controller in kube-controller-manager: it enumerates and deletes every namespaced resource inside before
+removing the `kubernetes` finalizer.
+
+Stuck almost always means one of three things: a resource inside has a finalizer nobody is removing, an
+aggregated APIService is unavailable so the namespace controller can't enumerate that resource type (the
+classic metrics-server case), or a webhook is rejecting the deletes. Diagnose with
+`kubectl get ns X -o jsonpath='{.status.conditions}'`, which names the failing group directly.
+
+Your involvement ended when garbage collection issued the delete. The general instinct is the point: half of
+platform on-call is telling "our thing is broken" apart from "Kubernetes is doing something slow and correct".
+
+### Controller vs admission policy vs request-time validation — what does each catch?
+
+They act at three different *moments*, which is why none replaces another. See
+[ADR-0004](./adr/0004-policy-enforcement-layers.md).
+
+**Request time** is the only layer with context the cluster doesn't have: budget across all of a team's
+environments, current capacity, whether a request this size needs a human. It also owns the error message —
+"your team's budget is 32 CPUs and you've asked for 64" is something a person can act on. Weakness: it only
+sees requests that come through it.
+
+**Admission** catches everything regardless of path — CI, a stray `kubectl`, another controller, or your own
+controller with a bug in it. Unbypassable by anyone with cluster access, which is its whole value. In exchange
+it's structurally limited (CEL can't call out or read other resources) and its messages are generic.
+
+**The controller** isn't a gate at all — it's the only one that *repairs*. Admission can reject a bad write but
+can't fix an object that's already wrong; request-time validation never sees the object again after creation.
+Continuous convergence is the property only the controller has.
+
+Compressed, and worth memorising in this form: **request-time knows why, admission catches everyone, the
+controller fixes it later.**
 
 ## Gaps to be honest about
 

@@ -29,15 +29,15 @@ doesn't pass, don't move on. Debugging a small thing now beats debugging a large
 |---|---|---|---|
 | **01** | [Scaffold and the Environment API](./01-scaffold-and-api.md) | worked | A cluster-scoped `Environment` CRD installed on kind, with validation and printer columns |
 | **02** | [The reconciler](./02-reconciler.md) | faded | An `Environment` that creates a namespace, quota and network policy, and reports status |
-| 03 | Ownership, finalizers and clean teardown | faded | Deleting an `Environment` removes everything it made, reliably |
-| 04 | Tier defaults and validation webhook | solo | `tier: prod` implies different defaults; bad specs rejected with useful messages |
-| 05 | Tests: envtest and a failure case | worked | Controller tests that run in CI, including a reconcile that fails halfway |
+| **03** | [Finalizers and clean teardown](./03-finalizers.md) | faded | Cleanup for the things garbage collection can't see — and a feel for when a finalizer is the wrong tool |
+| **04** | [Tier defaults and validation](./04-tier-defaults.md) | solo | Defaults that vary by tier, and bad specs rejected with messages that help |
+| **05** | [Tests with envtest](./05-tests.md) | worked | Controller tests that run in CI — tier defaults, the CEL rules, and a reconcile that fails halfway |
 
 ### Part 2 — Delivery
 
 | # | Example | Mode |
 |---|---|---|
-| 06 | Argo CD app-of-apps on kind | worked |
+| **06** | [Argo CD and the app-of-apps](./06-argocd-app-of-apps.md) | worked |
 | 07 | ApplicationSets per environment, and adding a second "region" | faded |
 | 08 | Argo Rollouts canary with automated analysis | faded |
 | 09 | Admission policy: VAP and MAP in audit, then enforce | faded |

@@ -193,6 +193,51 @@ func (r *EnvironmentReconciler) failed(ctx context.Context, env *platformv1alpha
 `+kubebuilder:subresource:status` bought you in 01). Using the wrong one is a common early mistake and the
 symptom is confusing: your spec changes get reverted.
 
+### Derived status: the TTL from example 01
+
+If you did the TTL exercise, this is where it pays off, and it demonstrates two rules worth keeping.
+
+**Compute defaults, don't write them into the spec.** The TTL default depends on tier, so it can't be a
+schema default. The temptation is to have the reconciler set `env.Spec.TTL` when it's empty. Don't: the spec
+belongs to the user, and once you've written to it you can't distinguish "they asked for a week" from "we
+filled it in". Compute the effective value each pass and persist only what you derive from it.
+
+**Derive from stable inputs.** Expiry is `creationTimestamp + ttl`, never `time.Now() + ttl`. Anything based
+on "now" produces a different answer every reconcile, so status gets rewritten, which triggers a watch, which
+reconciles again. That's the most common cause of a controller that spins at 100% doing nothing.
+
+```go
+const defaultTTL = 168 * time.Hour
+
+func effectiveTTL(env *platformv1alpha1.Environment) *metav1.Duration {
+	if env.Spec.Tier == "prod" {
+		return nil // production doesn't expire
+	}
+	if env.Spec.TTL != nil {
+		return env.Spec.TTL
+	}
+	return &metav1.Duration{Duration: defaultTTL}
+}
+```
+
+Then in `ready()`:
+
+```go
+	if ttl := effectiveTTL(env); ttl != nil {
+		expiry := metav1.NewTime(env.CreationTimestamp.Add(ttl.Duration))
+		env.Status.ExpiresAt = &expiry
+	} else {
+		env.Status.ExpiresAt = nil
+	}
+```
+
+The `else` is the part people leave out. Without it, an environment promoted from staging to prod keeps a
+stale expiry, and whatever reaps environments later happily deletes production.
+
+Worth deciding explicitly: a `ttl` set on a prod environment is currently ignored without comment. Silently
+discarding user input is unkind. Reject it at admission with a CEL rule, or surface a condition saying it
+isn't honoured — either is fine, but pick one.
+
 ## Step 7: watch what you own
 
 In `SetupWithManager`:
