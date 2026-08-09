@@ -10,16 +10,14 @@ spec:
   goTemplateOptions: ["missingkey=error"]
 
   generators:
-    - list:
-        elements:
-          - region: local
-            server: https://kubernetes.default.svc
-          - region: eu-west-1
-            server: https://eks-eu-west-1.example.com
-
+    - cluster: 
+        selector:
+          matchLabels:
+            paved-road/platform: "true"
+        
   template:
     metadata:
-      name: 'environment-controller-{{.region}}'
+      name: 'environment-controller-{{.nameNormalized}}'
     spec:
       project: default
       source:
