@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-environments
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  preserveResourcesOnDeletion: true
+
+  generators:
+    - git:
+        repoURL: https://github.com/sirdesmond/paved-road-platform.git
+        revision: main
+        directories:
+          - path: environments/*
+
+  template:
+    metadata:
+      name: 'env-{{.path.basename}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/sirdesmond/paved-road-platform.git
+        targetRevision: main
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+      syncPolicy:
+        automated:
+          # TODO(you): prune and selfHeal — decide deliberately.
+          # What does pruning mean for a resource that owns a namespace
+          # full of a team's workloads?
+          prune: true
+          selfHeal: true

@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-components
+  namespace: argocd
+spec:
+  goTemplate: true
+  # Fail loudly on a typo'd field instead of rendering an empty string into
+  # something important. Worth having on from day one.
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - region: local
+            server: https://kubernetes.default.svc
+          - region: eu-west-1
+            server: https://eks-eu-west-1.example.com
+
+  template:
+    metadata:
+      name: 'environment-controller-{{.region}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/sirdesmond/paved-road-platform.git
+        targetRevision: main
+        path: environment-controller/config/default
+      destination:
+        server: '{{.server}}'
+        namespace: environment-controller-system
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
