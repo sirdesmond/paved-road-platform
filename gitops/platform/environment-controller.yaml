@@ -1,25 +1,39 @@
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
-  name: environment-controller
+  name: platform-components
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
 spec:
-  project: default
-  source:
-    repoURL: https://github.com/sirdesmond/paved-road-platform.git
-    targetRevision: main
-    # Argo CD detects kustomization.yaml and renders it, so this is the same
-    # thing `make deploy` would have applied — just from Git instead of a laptop.
-    path: environment-controller/config/default
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: environment-controller-system
-  syncPolicy:
-    automated:
-      prune: true      # delete from Git means delete from the cluster
-      selfHeal: true   # hand edits get reverted
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true   # your CRD has a large schema; same reason as above
+  goTemplate: true
+  # Fail loudly on a typo'd field instead of rendering an empty string into
+  # something important. Worth having on from day one.
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - region: local
+            server: https://kubernetes.default.svc
+          # Adding a region is adding four lines here. That's the whole point.
+          # - region: eu-west-1
+          #   server: https://eks-eu-west-1.example.com
+
+  template:
+    metadata:
+      name: 'environment-controller-{{.region}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/sirdesmond/paved-road-platform.git
+        targetRevision: main
+        path: environment-controller/config/default
+      destination:
+        server: '{{.server}}'
+        namespace: environment-controller-system
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
