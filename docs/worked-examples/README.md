@@ -38,7 +38,7 @@ doesn't pass, don't move on. Debugging a small thing now beats debugging a large
 | # | Example | Mode |
 |---|---|---|
 | **06** | [Argo CD and the app-of-apps](./06-argocd-app-of-apps.md) | worked |
-| 07 | ApplicationSets per environment, and adding a second "region" | faded |
+| **07** | [ApplicationSets, and a region as a variable change](./07-applicationsets.md) | faded |
 | 08 | Argo Rollouts canary with automated analysis | faded |
 | 09 | Admission policy: VAP and MAP in audit, then enforce | faded |
 

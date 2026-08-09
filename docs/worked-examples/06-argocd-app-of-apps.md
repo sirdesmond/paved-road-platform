@@ -34,6 +34,10 @@ kubectl apply -n argocd --server-side --force-conflicts \
 kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 ```
 
+Note `stable` is a moving target: rebuild this cluster in six months and you'll get a different Argo CD.
+Fine while learning, not fine for anything you'd describe as reproducible. Pin the tag
+(`.../v2.x.y/manifests/install.yaml`) once you care, and see reflection question 3.
+
 `--server-side` is not optional. Argo CD's `applicationsets` CRD is larger than the 262144-byte limit on the
 annotation that client-side apply uses to record state, so a plain `kubectl apply` fails with
 `metadata.annotations: Too long`. Same failure mode as

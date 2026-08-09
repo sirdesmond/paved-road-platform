@@ -107,6 +107,73 @@ Continuous convergence is the property only the controller has.
 Compressed, and worth memorising in this form: **request-time knows why, admission catches everyone, the
 controller fixes it later.**
 
+## GitOps questions, worked through
+
+From the reflection section of [worked example 06](./worked-examples/06-argocd-app-of-apps.md).
+
+### When is `selfHeal: true` wrong?
+
+Two cases, and they're different problems.
+
+**Another controller legitimately owns a field.** An HPA scales a Deployment to 10, Argo CD sees Git says 2
+and reverts it. Two controllers with opposite opinions about one field, and the HPA loses every sync
+interval. The fix isn't disabling self-heal, it's `ignoreDifferences` on `/spec/replicas` — declaring that Git
+owns the shape of the Deployment but not that number. Same for anything an admission webhook mutates.
+
+**An incident.** Self-heal reverts your emergency fix while you're still watching, quietly, and the symptom
+returns minutes after you thought you'd fixed it.
+
+The emergency path has to exist before it's needed. Best: commit to Git with an expedited review — still
+fastest with a short sync interval, and it leaves a record. Otherwise disable auto-sync on the single app
+(`argocd app set <app> --sync-policy none`), make the change, and open a ticket to reconcile Git with reality
+*before* re-enabling. Skip that last step and the next sync silently undoes your fix hours later.
+
+The line worth saying out loud: **if the only way to fix production is to fight your own tooling, you'll do it
+badly at 3am.** The escape hatch belongs in a runbook, written while calm.
+
+### You delete an app's manifest from Git and `prune: true` is set. What happens?
+
+Something much worse than intended, if the Application bundles CRDs with the workload.
+
+`platform-root` prunes the child Application. Whether that cascades depends on the
+`resources-finalizer.argocd.argoproj.io` finalizer: with it, everything the Application managed is deleted;
+without it, resources are orphaned and keep running.
+
+If it cascades and the app includes `config/crd`, the CRD goes. Deleting a CRD deletes every custom resource
+of that type. Each one carries the controller's finalizer, and the controller's Deployment was deleted in the
+same sweep — so nothing can remove those finalizers. The CRs hang in `Terminating`, the CRD hangs behind them,
+and the namespaces they owned are never collected.
+
+You removed a deployment manifest, lost the data, and wedged the cluster on the way out.
+
+**The lesson: prune's blast radius is whatever happens to be in the Application.** CRDs don't belong in the
+same one as the workload that serves them. Split them out with pruning off, or annotate:
+
+```yaml
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+```
+
+Worth breaking on a throwaway cluster once. Far more memorable than reading about it.
+
+### Argo CD is installed imperatively. Where does the bootstrap chain stop?
+
+Something has to create the cluster and install Argo CD, and that something can't be Argo CD. The irreducible
+root is: a cluster, a controller that can pull from Git, and credentials to reach Git. Everything above it
+converges — Argo CD can even manage its own manifests after the first install, so upgrades become GitOps'd,
+but that first install is always a human running a command.
+
+Recovery is therefore: create cluster → install Argo CD → apply the root app → wait.
+
+That's only true for what's *in* Git, and three things usually aren't:
+
+- **Secrets** — which is why External Secrets (or equivalent) is a precondition for claiming you can rebuild.
+- **Stateful data** in volumes, which GitOps never recovers.
+- **Anything created imperatively that nobody wrote down** — the real killer, discovered only during the rebuild.
+
+A worked example of getting this wrong, from this repo: the Argo CD install points at `stable`, a moving
+target. Rebuild in six months and you get a different version. Fine for a lab, disqualifying for anything
+described as reproducible. Pin it.
+
 ## Gaps to be honest about
 
 - No production-scale operational experience *with this specific stack* — compensate by being precise about what you built vs. designed. Never imply the designed parts are running.
