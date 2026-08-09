@@ -10,7 +10,7 @@ spec:
   goTemplateOptions: ["missingkey=error"]
 
   generators:
-    - cluster: 
+    - clusters: 
         selector:
           matchLabels:
             paved-road/platform: "true"
