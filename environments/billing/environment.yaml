@@ -1,0 +1,7 @@
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: billing-dev
+spec:
+  owner: {team: billing, contact: "#team-billing"}
+  tier: dev
