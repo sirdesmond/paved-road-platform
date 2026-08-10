@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: nginxdemos/hello:plain-text
+          image: nginxdemos/hello:latest
           ports:
             - containerPort: 80
           resources:
