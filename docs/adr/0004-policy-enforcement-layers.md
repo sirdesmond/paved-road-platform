@@ -59,6 +59,37 @@ policy engine would mean two things owning the same objects.
 - We depend on a recent Kubernetes version for MAP. Acceptable on managed EKS; would be a blocker on an older cluster, and that's the condition that would push us back toward Kyverno for the whole job.
 - Adding Kyverno later for signature verification is additive. Nothing here has to be undone.
 
+## Amendment, 2026-08-09: Git is also a request path
+
+Building the self-service flow in [worked example 07](../worked-examples/07-applicationsets.md) exposed a gap
+in the reasoning above.
+
+This ADR assumed requests arrive through `platform-api`, which is where the contextual checks and good error
+messages live. But the ApplicationSet flow makes **Git itself a request path**: a team adds a directory under
+`environments/`, Argo CD applies it, and `platform-api` is never involved. The layer this ADR leans on
+hardest isn't in the loop for the flow teams actually use.
+
+Concretely, a team can commit an `Environment` requesting 200 CPUs today and nothing rejects it. Admission
+has no bound on CPU or memory (only on `pods`), and the controller isn't a gate — it faithfully creates a
+quota nobody can satisfy, so the failure surfaces later as pods stuck Pending, far from the person who caused
+it.
+
+**The correction: request-time validation has to exist wherever requests originate.** For the Git path, that
+is CI on the pull request:
+
+- Schema and policy validation of every `Environment` under `environments/**` before merge.
+- Tier limits and team budgets checked with the same rules `platform-api` would apply.
+- Failures reported on the PR, where the developer already is.
+
+This doesn't replace admission — CI can be skipped, and admission is the backstop that can't be. It restores
+the property the original decision was built on: the fast, contextual, human-readable check happens *before*
+the object exists.
+
+Two follow-ups fall out of it:
+
+- Add CEL bounds for CPU and memory, per tier. The absence was invisible until the Git path made it reachable without review.
+- Treat merge permission on `environments/**` as provisioning permission (branch protection, `CODEOWNERS` per team directory). The review on that path is an authorization control, not a code-quality step.
+
 ## Revisit if
 
 - We end up writing enough CEL that a proper policy language with testing and reporting tooling becomes worth the operational cost.

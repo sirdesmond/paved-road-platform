@@ -1,0 +1,81 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: demo
+  namespace: payments-dev
+spec:
+  replicas: 5
+  selector:
+    matchLabels: {app: demo}
+  template:
+    metadata:
+      labels: {app: demo}
+    spec:
+      containers:
+        - name: app
+          image: nginxdemos/hello:plain-text
+          ports:
+            - containerPort: 80
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 50m, memory: 64Mi}
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: {duration: 30s}
+        - setWeight: 60
+        - pause: {duration: 30s}
+        - analysis:
+            templates: demo-analysis-template
+            args:
+              - name: service-name
+                value: demo
+        
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: demo-analysis-template
+  namespace: payments-dev
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: canary-healthy
+      # Three measurements, 20s apart. Any failure fails the analysis.
+      count: 3
+      interval: 20s
+      failureLimit: 0
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: probe
+                    image: curlimages/curl:8.5.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        fail=0
+                        for i in $(seq 1 20); do
+                          code=$(curl -s -m 2 -o /dev/null -w '%{http_code}' \
+                            http://{{args.service-name}}.payments-dev.svc.cluster.local/ || echo 000)
+                          [ "$code" = "200" ] || fail=$((fail+1))
+                        done
+                        echo "failures: $fail/20"
+                        [ "$fail" -le 2 ]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+  namespace: payments-dev
+spec:
+  selector: {app: demo}
+  ports:
+    - port: 80
+      targetPort: 80

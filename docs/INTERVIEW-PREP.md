@@ -174,6 +174,56 @@ A worked example of getting this wrong, from this repo: the Argo CD install poin
 target. Rebuild in six months and you get a different version. Fine for a lab, disqualifying for anything
 described as reproducible. Pin it.
 
+### One region is unreachable. What do the others do?
+
+Nothing — they're unaffected. Each generated Application is an independent object with its own sync and health
+state, so a destination failure is contained to one node in the tree. (Demonstrated accidentally, by pointing
+a list-generator element at a cluster that didn't exist.)
+
+The unreachable one goes `Unknown` for sync, because Argo CD can't compare against a cluster it can't read,
+and its sync operations fail with backoff.
+
+**The ApplicationSet itself stays healthy**, and the reason is the interesting part: its status reports on
+*generation*, not on the health of what it generated. The cluster generator reads cluster Secrets from the
+Argo CD namespace — it never contacts the clusters. Generation is decoupled from reachability. The dependency
+that *would* break it is Git: if the repo is unreachable, a git generator can't enumerate and the
+ApplicationSet errors.
+
+Operational subtlety worth volunteering: Argo CD won't prune what it can't see, so an outage causes no
+deletions. But deregistering the broken cluster during the incident makes the generator stop producing that
+Application, Argo CD tries to clean up, fails to reach the cluster, and leaves the resources orphaned and
+unmanaged when it returns. **Don't deregister clusters during incidents.**
+
+### A team commits a request for 200 CPUs. What stops them?
+
+Today, nothing — and being able to say that precisely is the point.
+
+**Request-time validation doesn't apply.** They edited a file in Git; `platform-api` was never involved. That's
+the documented weakness of that layer, and in this flow it isn't theoretical — Git *is* the path everyone uses.
+
+**Admission should catch it and doesn't.** There are bounds on `pods` but none on CPU or memory, so the API
+server accepts it.
+
+**The controller isn't a gate.** It faithfully creates a quota nobody can satisfy, and the failure surfaces
+much later as pods stuck Pending — far in time and place from whoever caused it.
+
+The finding this produced is the good bit: [ADR-0004](./adr/0004-policy-enforcement-layers.md) assumed
+requests arrive through the API, but the GitOps flow bypasses it entirely. The fix is that **CI on the pull
+request becomes the request-time layer** — same rules, run before merge, reported where the developer already
+is. Admission stays as the backstop that can't be skipped. The ADR now carries that as an amendment.
+
+### Adding a directory grants an environment. What does that make PR review?
+
+An authorization control, not a code-quality step. **Merge permission is provisioning permission.**
+
+Three consequences: `CODEOWNERS` has to scope teams to their own directories, or one team can edit another's.
+Platform config needs stricter ownership than tenant requests, and eventually a separate repo, so that being
+able to *request* an environment doesn't imply being able to change the platform that grants them. And Git
+history becomes the provisioning audit log — who approved what, when — which is better evidence than most
+ticket systems produce.
+
+Branch protection on that path is a security setting. Worth saying in exactly those words.
+
 ## Gaps to be honest about
 
 - No production-scale operational experience *with this specific stack* — compensate by being precise about what you built vs. designed. Never imply the designed parts are running.
