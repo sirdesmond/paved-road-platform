@@ -27,11 +27,11 @@ spec:
         - setWeight: 60
         - pause: {duration: 30s}
         - analysis:
-            templates: demo-analysis-template
+            templates:
+              - templateName: demo-analysis-template
             args:
               - name: service-name
                 value: demo
-        
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
