@@ -1,0 +1,9 @@
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: payments-dev
+spec:
+  owner:
+    team: payments
+    contact: "#team-payments"
+  tier: dev

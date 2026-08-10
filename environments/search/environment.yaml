@@ -1,0 +1,9 @@
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: search-dev
+spec:
+  owner:
+    team: search
+    contact: "#team-search"
+  tier: dev
