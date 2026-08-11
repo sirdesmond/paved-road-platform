@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-tier-limits
+  namespace: platform-system
+data:
+  dev-cpu: "8"
+  staging-cpu: "16"
+  prod-cpu: "64"

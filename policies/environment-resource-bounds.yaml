@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: environment-resource-bounds
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["platform.internal"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["environments"]
+  validations:
+    - expression: >
+        !has(object.spec.resources) || !has(object.spec.resources.cpu) ||
+        quantity(string(object.spec.resources.cpu))
+          .isLessThan(quantity(params.data[object.spec.tier + '-cpu']))
+      messageExpression: >
+        'cpu ' + string(object.spec.resources.cpu) + ' exceeds the ' + object.spec.tier +
+        ' ceiling of ' + params.data[object.spec.tier + '-cpu'] +
+        '. Ask in #platform if you need it raised.'
+      reason: Invalid

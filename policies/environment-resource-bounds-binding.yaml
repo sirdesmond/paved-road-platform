@@ -1,0 +1,12 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: environment-resource-bounds
+spec:
+  policyName: environment-resource-bounds
+  validationActions: ["Audit", "Warn"]   # not Deny. Not yet.
+  paramRef:
+    name: environment-tier-limits
+    namespace: platform-system
+    parameterNotFoundAction: Deny
+  matchResources: {}
