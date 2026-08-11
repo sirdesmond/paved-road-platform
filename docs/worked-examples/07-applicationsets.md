@@ -9,6 +9,24 @@ Assumes [06](./06-argocd-app-of-apps.md) is green.
 
 ---
 
+## Files you'll create
+
+All at the repo root. Nothing is applied by hand — `platform-root` from example 06 already watches
+`gitops/platform/`.
+
+```
+paved-road-platform/
+├── gitops/platform/
+│   ├── platform-components.yaml    # RENAMED from environment-controller.yaml, now an ApplicationSet
+│   └── team-environments.yaml      # NEW: the git-directory generator
+└── environments/                   # NEW: one directory per team
+    ├── payments/environment.yaml   # NEW
+    └── search/environment.yaml     # NEW
+```
+
+Renaming the file is safe — Argo CD tracks resources by name and kind, not filename. Changing
+`metadata.name` inside would create a new resource and orphan the old one.
+
 ## The problem with what you have
 
 `gitops/platform/environment-controller.yaml` hardcodes one repo, one path, one destination. Adding a second

@@ -9,6 +9,24 @@ Assumes Part 1 works and the repo is pushed to GitHub.
 
 ---
 
+## Files you'll create
+
+Two new files at the **repo root**, plus a couple of edits inside the controller. Commands are run from the
+repo root unless a step says otherwise.
+
+```
+paved-road-platform/
+├── gitops/                                    # NEW
+│   ├── bootstrap/root-app.yaml                # NEW: applied once, by hand
+│   └── platform/environment-controller.yaml   # NEW: the controller's Application
+└── environment-controller/
+    ├── config/manager/kustomization.yaml      ← image name/tag (via `kustomize edit set image`)
+    └── config/manager/manager.yaml            ← imagePullPolicy: IfNotPresent
+```
+
+Everything under `gitops/platform/` is picked up automatically once the root app exists. `root-app.yaml` is
+the only thing you ever `kubectl apply` by hand, and only once per cluster.
+
 ## The shift
 
 Until now you've run the controller with `make run`, and `make deploy` would push it into the cluster from

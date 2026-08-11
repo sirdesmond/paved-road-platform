@@ -9,6 +9,19 @@ Assumes [04](./04-tier-defaults.md) works.
 
 ---
 
+## Files you'll touch
+
+Run commands from `environment-controller/`.
+
+```
+environment-controller/
+├── internal/controller/environment_controller_test.go   ← replace with the tests below
+├── internal/controller/suite_test.go                    (already scaffolded; check it)
+└── Makefile                                             (optional: ARGS passthrough, cover targets)
+```
+
+Plus `.github/workflows/test.yml` at the **repo root** if you want CI.
+
 ## What envtest actually is
 
 `envtest` starts a **real `kube-apiserver` and `etcd`** as local processes and points your client at them.

@@ -9,6 +9,22 @@ Assumes [02](./02-reconciler.md) passes its checkpoint.
 
 ---
 
+## Files you'll touch
+
+Same single file as example 02, plus a namespace that has to exist. Run commands from
+`environment-controller/`.
+
+```
+environment-controller/
+├── internal/controller/environment_controller.go   ← finalizer + registry logic
+├── cmd/main.go                                     ← the --registry-namespace flag
+└── config/manager/manager.yaml                     ← POD_NAMESPACE via downward API
+```
+
+```bash
+kubectl create namespace platform-system    # where the shared index lives
+```
+
 ## First question: do you actually need one?
 
 Almost every finalizer bug I've seen came from adding one that wasn't needed. So start here.

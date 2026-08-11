@@ -40,13 +40,13 @@ doesn't pass, don't move on. Debugging a small thing now beats debugging a large
 | **06** | [Argo CD and the app-of-apps](./06-argocd-app-of-apps.md) | worked |
 | **07** | [ApplicationSets, and a region as a variable change](./07-applicationsets.md) | faded |
 | **08** | [Progressive delivery with Argo Rollouts](./08-progressive-delivery.md) | faded |
-| 09 | Admission policy: VAP and MAP in audit, then enforce | faded |
+| **09** | [Admission policy: audit, then enforce](./09-admission-policy.md) | faded |
 
 ### Part 3 — The API and the cloud
 
 | # | Example | Mode |
 |---|---|---|
-| 10 | `platform-api`: validate a request, render, open a PR | worked |
+| **10** | [`platform-api`: validate, render, open a PR](./10-platform-api.md) | worked |
 | 11 | `platformctl`: the CLI over the same contract | solo |
 | 12 | Terraform: VPC, EKS and IRSA, with teardown | worked |
 | 13 | Multi-account and the second region | faded |

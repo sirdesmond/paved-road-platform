@@ -7,6 +7,19 @@ Assumes [03](./03-finalizers.md) works.
 
 ---
 
+## Files you'll touch
+
+Run commands from `environment-controller/`.
+
+```
+environment-controller/
+├── api/v1alpha1/environment_types.go               ← remove schema defaults, add CEL rules,
+│                                                     add status.effectiveResources
+└── internal/controller/environment_controller.go   ← tierDefaults table + effectiveResources()
+```
+
+Plus an ADR in `docs/adr/` for the decision in step 1 — that's part of the deliverable, not paperwork.
+
 ## The problem
 
 Your `tier` field claims to drive defaults. It doesn't. A dev environment and a production one both get

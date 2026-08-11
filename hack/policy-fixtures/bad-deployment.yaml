@@ -1,0 +1,28 @@
+# Three violations at once, for workload-baseline:
+#   1. no resources.limits
+#   2. :latest tag
+#   3. missing app.kubernetes.io/name label
+#
+# In Audit you should get three warnings on one apply — which is also a test
+# of your messages. Three vague ones stacked together are unreadable, and
+# that's the moment to notice.
+#
+# Also apply this in `default` (outside the namespaceSelector) — it should be
+# accepted there, proving the policy is scoped to team namespaces and you
+# haven't pointed a failurePolicy: Fail policy at the whole cluster.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad
+  namespace: payments-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: bad}
+  template:
+    metadata:
+      labels: {app: bad}
+    spec:
+      containers:
+        - name: app
+          image: nginx:latest

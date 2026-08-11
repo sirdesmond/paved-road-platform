@@ -1,0 +1,30 @@
+# For the mutating policy. Satisfies workload-baseline (limits set, pinned
+# tag, name label) but has no securityContext — so pod-security-defaults has
+# something to inject.
+#
+#   kubectl apply --dry-run=server -o yaml -f hack/policy-fixtures/plain-deployment.yaml \
+#     | yq '.spec.template.spec.securityContext'
+#
+# You want runAsNonRoot and the seccomp profile to appear in output that was
+# never in the input. A mutating policy that silently doesn't fire looks
+# exactly like one that isn't installed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plain
+  namespace: payments-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: plain}
+  template:
+    metadata:
+      labels:
+        app: plain
+        app.kubernetes.io/name: plain
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.27-alpine
+          resources:
+            limits: {cpu: 50m, memory: 64Mi}

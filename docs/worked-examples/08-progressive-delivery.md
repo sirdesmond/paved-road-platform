@@ -9,6 +9,23 @@ Assumes [07](./07-applicationsets.md) works.
 
 ---
 
+## Files you'll create
+
+Both at the repo root, both picked up automatically — the first by `platform-root`, the second by the
+`team-environments` ApplicationSet.
+
+```
+paved-road-platform/
+├── gitops/platform/argo-rollouts.yaml       # NEW: installs Argo Rollouts
+└── environments/payments/
+    ├── environment.yaml                     (already exists — must not be empty)
+    └── demo-app.yaml                        # NEW: Rollout + AnalysisTemplate + Service
+```
+
+The `Rollout` targets `namespace: payments-dev`, which your controller creates from the `Environment`. So
+`environment.yaml` has to actually define one, and its `metadata.name` must be `payments-dev` — the
+controller names the namespace after the Environment.
+
 ## Why this exists
 
 Everything you've built so far makes deployment *correct*. None of it makes deployment *safe*.

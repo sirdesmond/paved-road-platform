@@ -1,0 +1,18 @@
+# No resources block at all. MUST PASS.
+#
+# This is the one that catches the most common CEL mistake. `spec.resources`
+# and `spec.resources.cpu` are both optional, and CEL evaluating a missing
+# field is an ERROR, not false — which under failurePolicy: Fail becomes a
+# rejection. If this fixture is rejected, your has() guards are missing and
+# the policy is blocking every legitimate request that omits resources.
+#
+# Test this before you enforce anything.
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: bare-dev
+spec:
+  owner:
+    team: search
+    contact: "#team-search"
+  tier: dev

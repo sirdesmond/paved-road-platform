@@ -1,0 +1,13 @@
+# The control case. Must always apply cleanly — if this is ever rejected,
+# the policy is wrong, not the request.
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: reasonable-dev
+spec:
+  owner:
+    team: search
+    contact: "#team-search"
+  tier: dev
+  resources:
+    cpu: "4"

@@ -33,7 +33,8 @@
 - **Why the policy engine isn't Kyverno by default** ([ADR-0004](./adr/0004-policy-enforcement-layers.md)). Good current-knowledge signal: ValidatingAdmissionPolicy went GA in 1.30 and MutatingAdmissionPolicy in 1.36, so native CEL policy handles the structural rules in-process with no webhook to run or fail open. Kyverno comes in only for image signature verification, because CEL can't make external calls. Then the design point underneath it: admission is the *last* place to catch a problem, so most of the guardrail work lives at request time in the Go API where the error message can actually help someone.
 - **Adoption as the real metric.** "If teams don't use the paved road, the paved road is wrong" — and how you'd instrument it from day one.
 - **Why no portal and no Crossplane in v1** ([ADR-0003](./adr/0003-no-portal-or-crossplane-in-v1.md)). Strong Staff answer: a portal decorates a provisioning bottleneck rather than removing it, and environment provisioning is procedural logic that belongs in testable Go. Then name the revisit triggers — that's what separates "I scoped this" from "I didn't get to it." If asked whether you know them, point at the sibling repo where you ran Crossplane v2 and debugged real CRD failures.
-- **A real debugging story.** The Kyverno CRD annotation-size incident from the sibling repo: symptom (controller crashloop), false leads (assumed a missing chart), the tell (only the largest CRDs missing → size limit, not rendering), fix (server-side apply), prevention (default SSA for CRD-bearing charts). Staff interviews want the reasoning, including the wrong turns.
+- **The best debugging story in this repo**: an admission policy deadlocked an object with a finalizer ([runbook 0004](./runbooks/0004-admission-policy-deadlocks-finalizer.md)). Deleting needed the finalizer removed, removing it was an `UPDATE`, and the policy denied every update because the object still violated the rule. Two guardrails you built, each correct alone, combining into an object that could never be deleted — and audit mode couldn't reveal it, because in Audit the update succeeds. The fix is a transition rule on `oldObject` that permits unchanged violations. The transferable point: **enforcing a policy changes the meaning of every future write to a matching object, not just writes to the offending field.**
+- **A second debugging story.** The Kyverno CRD annotation-size incident from the sibling repo: symptom (controller crashloop), false leads (assumed a missing chart), the tell (only the largest CRDs missing → size limit, not rendering), fix (server-side apply), prevention (default SSA for CRD-bearing charts). Staff interviews want the reasoning, including the wrong turns.
 
 ## Controller questions, worked through
 
@@ -223,6 +224,59 @@ history becomes the provisioning audit log — who approved what, when — which
 ticket systems produce.
 
 Branch protection on that path is a security setting. Worth saying in exactly those words.
+
+## Progressive delivery questions, worked through
+
+From [worked example 08](./worked-examples/08-progressive-delivery.md).
+
+### Your probe hits the Service, which balances across canary and stable. Does it catch a broken canary?
+
+At 20% with 5 replicas there's 1 canary pod, so ~4 failures in 20 requests — over a 2-failure threshold, so
+yes. (The analysis step actually runs at 60%, where it's ~12/20.)
+
+The uncomfortable part is what happens when you make the canary *safer*. Aggregate error rate scales with
+canary weight, so a **100%-broken canary at 5% weight produces a 5% aggregate error rate** — statistically
+indistinguishable from noise, and with 20 requests you might see zero failures by chance.
+
+**The smaller and safer the canary, the more invisible its failure becomes to aggregate measurement.**
+
+Two consequences worth stating:
+
+- Replica-based canary can't go below `1/replicas`. Five pods means 20% is the floor; a 5% canary needs 20 replicas. Traffic shaping decouples weight from replica count.
+- Real canary analysis doesn't measure the aggregate at all. It queries canary and stable metrics *separately*, filtered on the pod-template-hash label, and compares them. That — not the traffic splitting itself — is the actual reason a mesh and per-version metrics matter.
+
+### Argo CD's selfHeal reverts drift. Rollouts changes replica counts mid-rollout. Why don't they fight?
+
+Because the ownership boundary is clean. Argo CD's desired state is the `Rollout` object in Git. The Rollouts
+controller manipulates ReplicaSets and pods *beneath* it — not in Git, not created by Argo CD, and carrying
+owner references marking them as controller-managed children. Nothing Rollouts touches is something Argo CD
+has an opinion about.
+
+They fight when a controller mutates the Rollout's **own spec**. Three realistic cases:
+
+- **An HPA scaling `spec.replicas`** — the classic. `ignoreDifferences` on `/spec/replicas`.
+- **`kubectl argo rollouts pause`**, which sets `spec.paused: true`. Argo CD reverts it and your rollout un-pauses itself. Needs `ignoreDifferences` on `/spec/paused`.
+- **`kubectl argo rollouts set image`**, which writes the image into the spec and gets reverted to whatever Git says. Arguably correct — imperative promotion is fighting GitOps — but it means the CLI's most convenient command is one a GitOps platform shouldn't use.
+
+### Should teams write their own Rollout?
+
+No, and the manifest is the evidence: ~80 lines, most of it delivery *policy* — step weights, pause
+durations, failure thresholds, the definition of healthy. Only a few lines are the team's application.
+
+Left to teams, every squad invents its own rollout policy, quality varies with whoever wrote it, thresholds
+get loosened after a flaky Friday, and the platform can't state anything true about how changes reach
+production. Hand-built environments again, one layer up.
+
+**The boundary: the platform owns the policy, teams own the payload.** Three moves that don't require the
+platform to own application specs:
+
+- A **`ClusterAnalysisTemplate`** with vetted thresholds, so teams reference `templateName: standard-canary` rather than writing probe logic. One place to fix when the thresholds prove wrong.
+- The strategy as a **kustomize base or golden-path template** — teams supply image, name, resources; steps come from the platform.
+- An **admission rule** that prod-tier namespaces accept only `Rollout` (not bare `Deployment`) referencing an approved analysis template. That makes the paved road the only road to production without owning what teams deploy.
+
+The cost is the same as the tier-defaults table: changing the standard steps becomes a fleet-wide change.
+Which is correct — that's a decision the platform should make deliberately rather than fifty teams making it
+by accident.
 
 ## Gaps to be honest about
 

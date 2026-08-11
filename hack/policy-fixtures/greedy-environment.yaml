@@ -1,0 +1,14 @@
+# Trips environment-resource-bounds: 200 CPUs against a dev ceiling of 8.
+# In Audit mode this applies with a warning. After flipping the binding to
+# Deny it should be rejected with the messageExpression.
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: greedy-dev
+spec:
+  owner:
+    team: search
+    contact: "#team-search"
+  tier: dev
+  resources:
+    cpu: "200"
