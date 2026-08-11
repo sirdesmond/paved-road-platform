@@ -17,7 +17,10 @@ spec:
     - expression: >
         !has(object.spec.resources) || !has(object.spec.resources.cpu) ||
         quantity(string(object.spec.resources.cpu))
-          .isLessThan(quantity(params.data[object.spec.tier + '-cpu']))
+          .isLessThan(quantity(params.data[object.spec.tier + '-cpu'])) ||
+        (oldObject != null &&
+        has(oldObject.spec.resources) && has(oldObject.spec.resources.cpu) &&
+        string(oldObject.spec.resources.cpu) == string(object.spec.resources.cpu))
       messageExpression: >
         'cpu ' + string(object.spec.resources.cpu) + ' exceeds the ' + object.spec.tier +
         ' ceiling of ' + params.data[object.spec.tier + '-cpu'] +
