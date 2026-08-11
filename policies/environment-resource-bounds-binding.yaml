@@ -4,7 +4,7 @@ metadata:
   name: environment-resource-bounds
 spec:
   policyName: environment-resource-bounds
-  validationActions: ["Audit", "Warn"]   # not Deny. Not yet.
+  validationActions: ["Deny", "Audit"]   # not Deny. Not yet.
   paramRef:
     name: environment-tier-limits
     namespace: platform-system
