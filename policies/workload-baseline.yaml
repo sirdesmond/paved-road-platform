@@ -1,0 +1,54 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: workload-baseline
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+      - apiGroups: ["argoproj.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["rollouts"]
+
+  variables:
+    # Deployment and Rollout share the same pod-template path, so one
+    # expression covers both. Init containers are deliberately included —
+    # an unbounded init container defeats the quota just as well.
+    - name: containers
+      expression: >
+        object.spec.template.spec.containers +
+        (has(object.spec.template.spec.initContainers)
+          ? object.spec.template.spec.initContainers : [])
+
+  validations:
+    - expression: >
+        variables.containers.all(c,
+          has(c.resources) && has(c.resources.limits) &&
+          'cpu' in c.resources.limits && 'memory' in c.resources.limits)
+      messageExpression: >
+        'every container needs resources.limits.cpu and resources.limits.memory. ' +
+        'Without them the namespace quota cannot protect you, and one container can starve the rest.'
+      reason: Invalid
+
+    - expression: >
+        variables.containers.all(c,
+          !c.image.endsWith(':latest') &&
+          (c.image.contains('@sha256:') || c.image.matches('^.+:[^:/]+$')))
+      messageExpression: >
+        'images must be pinned to a tag or digest, and :latest is not a version. ' +
+        'A rollback needs something to roll back to.'
+      reason: Invalid
+
+    - expression: >
+        has(object.spec.template.metadata) &&
+        has(object.spec.template.metadata.labels) &&
+        'app.kubernetes.io/name' in object.spec.template.metadata.labels
+      messageExpression: >
+        'pods need an app.kubernetes.io/name label so dashboards, alerts and cost reports ' +
+        'can attribute them to something.'
+      reason: Invalid

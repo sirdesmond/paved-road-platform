@@ -1,0 +1,12 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: workload-baseline-audit
+spec:
+  policyName: workload-baseline
+  validationActions: ["Audit", "Warn"]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: platform.internal/team
+          operator: Exists

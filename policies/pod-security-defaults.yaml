@@ -1,0 +1,35 @@
+apiVersion: admissionregistration.k8s.io/v1   # ← match your cluster
+kind: MutatingAdmissionPolicy
+metadata:
+  name: pod-security-defaults
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+      - apiGroups: ["argoproj.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["rollouts"]
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >
+          Object{
+            spec: Object.spec{
+              template: Object.spec.template{
+                spec: Object.spec.template.spec{
+                  securityContext: Object.spec.template.spec.securityContext{
+                    runAsNonRoot: true,
+                    seccompProfile: Object.spec.template.spec.securityContext.seccompProfile{
+                      type: "RuntimeDefault"
+                    }
+                  }
+                }
+              }
+            }
+          }
