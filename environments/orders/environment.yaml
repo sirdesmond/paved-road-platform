@@ -1,0 +1,13 @@
+apiVersion: platform.internal/v1alpha1
+kind: Environment
+metadata:
+  name: orders-dev
+spec:
+  owner:
+    contact: '#team-orders'
+    team: orders
+  resources:
+    cpu: "0"
+    memory: "0"
+  tier: dev
+status: {}
