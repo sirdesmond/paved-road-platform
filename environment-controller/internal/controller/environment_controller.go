@@ -277,6 +277,13 @@ func (r *EnvironmentReconciler) ready(ctx context.Context, env *platformv1alpha1
 	} else {
 		env.Status.ExpiresAt = nil
 	}
+	// Observe only on the transition to Ready. Recording on every reconcile
+	// would pile up samples for environments that have been ready for days and
+	// make the histogram describe uptime rather than provisioning time.
+	if !meta.IsStatusConditionTrue(before.Conditions, "Ready") {
+		environmentTimeToReady.Observe(time.Since(env.CreationTimestamp.Time).Seconds())
+	}
+
 	meta.SetStatusCondition(&env.Status.Conditions, metav1.Condition{
 		Type:               "Ready",
 		Status:             metav1.ConditionTrue,
@@ -295,6 +302,11 @@ func (r *EnvironmentReconciler) ready(ctx context.Context, env *platformv1alpha1
 
 func (r *EnvironmentReconciler) failed(ctx context.Context, env *platformv1alpha1.Environment, reason string, cause error) (ctrl.Result, error) {
 	before := env.Status.DeepCopy()
+
+	// Count every failure, including repeats during backoff — the rate is what
+	// the alert looks at, and a failure that keeps happening should keep
+	// counting.
+	environmentFailures.WithLabelValues(reason).Inc()
 
 	meta.SetStatusCondition(&env.Status.Conditions, metav1.Condition{
 		Type:               "Ready",

@@ -1,0 +1,22 @@
+# Let Prometheus read the protected metrics endpoint.
+#
+# The manager serves /metrics over TLS and runs every request through
+# authn/authz (that's the FilterProvider in main.go). So being able to reach
+# the port isn't enough — Prometheus's ServiceAccount has to be *authorised*
+# to GET /metrics, or every scrape comes back 403 and the target shows as down
+# with no obvious reason.
+#
+# kubebuilder already generates the metrics-reader ClusterRole. This binds it
+# to the scraper.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-reader-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metrics-reader          # namePrefix makes this environment-controller-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: kube-prometheus-stack-prometheus
+    namespace: monitoring

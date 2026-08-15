@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-slos
+  namespace: monitoring
+spec:
+  groups:
+    - name: environment-provisioning
+      rules:
+        - alert: EnvironmentProvisioningFailing
+          expr: sum(rate(environment_reconcile_failures_total[10m])) by (reason) > 0
+          for: 10m
+          labels:
+            severity: high
+          annotations:
+            summary: "Environments failing to provision ({{ $labels.reason }})"
+            description: >
+              Teams cannot self-serve. Reason label matches the Ready condition,
+              so `kubectl describe environment` will say the same thing.
+            runbook_url: "https://github.com/sirdesmond/paved-road-platform/blob/main/docs/runbooks/0005-provisioning-failing.md"
+
+        - alert: EnvironmentProvisioningSlow
+          expr: histogram_quantile(0.95, sum(rate(environment_time_to_ready_seconds_bucket[30m])) by (le)) > 120
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "p95 time-to-ready above the 120s objective"
+            runbook_url: "https://github.com/sirdesmond/paved-road-platform/blob/main/docs/runbooks/0005-provisioning-failing.md"
+
+        - alert: EnvironmentControllerDown
+          expr: up{job=~".*environment-controller.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "The environment controller is not being scraped"
+            description: >
+              Nothing is reconciling. Existing environments keep running, but
+              nobody can create, change or delete one.
+            runbook_url: "https://github.com/sirdesmond/paved-road-platform/blob/main/docs/runbooks/0005-provisioning-failing.md"

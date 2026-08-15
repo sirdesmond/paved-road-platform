@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"   # CRDs before anything that uses them
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: "77.*"
+    helm:
+      values: |
+        # Keep it small — this is a laptop.
+        grafana:
+          enabled: true
+          adminPassword: admin
+        prometheus:
+          prometheusSpec:
+            retention: 24h
+            resources:
+              requests: {cpu: 100m, memory: 512Mi}
+            # Watch rules in every namespace, not just the release's own.
+            ruleSelectorNilUsesHelmValues: false
+            serviceMonitorSelectorNilUsesHelmValues: false
+        alertmanager:
+          alertmanagerSpec:
+            resources:
+              requests: {cpu: 10m, memory: 64Mi}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true    # these CRDs are enormous. See runbook 0001.
