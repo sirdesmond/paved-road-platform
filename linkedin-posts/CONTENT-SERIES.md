@@ -97,6 +97,22 @@ Around 250 words. The first two lines matter most; LinkedIn hides the rest behin
 
 ---
 
+## Publishing order (decided)
+
+Different from the numbering, which reflects when things were drafted rather than when they ship.
+
+| Slot | Post | Why here |
+|---|---|---|
+| **1** | [Post 4 — the deadlock](./post-4-admission-deadlock.md) | A scar, not an opinion. Nobody else could have written it, needs no prior context, and establishes that you build things before you argue about them. |
+| **2** | [Post 5 — shift down, and the bill](./post-5-shift-down-bill.md) | Synthesis lands once there's evidence behind it. The callback to post 1 is what stops it reading as commentary. |
+| **3** | [Post 2 — the Terraform boundary](./post-2-terraform-boundary.md) | Concrete and argumentative, a change of pace after two conceptual posts. Highest comment potential of the set. |
+| **4** | [Post 3 — what I didn't build](./post-3-what-i-didnt-build.md) | Needs readers to know what the platform is. Works properly once posts 1–3 have established it. |
+| later | [Post 0 — the kickoff](./post-0-kickoff.md) | Reframed. Not "I'm starting a series" but "here's the whole thing these pieces belong to". |
+
+**Why not lead with the kickoff:** announcing a series before publishing anything is a promise made to an
+audience that doesn't exist yet, and it creates an obligation you'll resent in three weeks. Lead with
+substance; describe the series once it demonstrably exists.
+
 ## Post plan
 
 ### Publishable now (decision posts)

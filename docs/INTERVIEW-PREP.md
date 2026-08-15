@@ -278,6 +278,71 @@ The cost is the same as the tier-defaults table: changing the standard steps bec
 Which is correct — that's a decision the platform should make deliberately rather than fifty teams making it
 by accident.
 
+## Admission policy questions, worked through
+
+From [worked example 09](./worked-examples/09-admission-policy.md).
+
+### What's the blast radius of a CEL typo under `failurePolicy: Fail`?
+
+Everything matching `matchConstraints` and the binding's scope, immediately and totally — and since policies
+ship via GitOps, a bad push reaches every targeted cluster within a sync interval.
+
+But the webhook comparison favours native policy in a way worth articulating. A webhook with the same failure
+policy has the *same* blast radius plus a much larger set of causes: evicted pod, drained node, expired
+certificate, network partition, timeout. Most webhook outages have nothing to do with policy logic. **VAP runs
+in-process, so it can only fail because you wrote something wrong** — a strictly smaller failure surface, and
+a better argument for native policy than operational convenience is.
+
+Two mitigations:
+
+- The API server **type-checks CEL against the schema at policy creation**, catching a whole class of typos before the policy ever runs: `kubectl get validatingadmissionpolicy X -o jsonpath='{.status.typeChecking}'`. What it can't catch is a logically wrong expression — right types, wrong meaning. That's what Audit mode and fixtures are for.
+- Never let a policy match `validatingadmissionpolicies` or their bindings. That's the one genuine way to lock yourself out, because the escape hatch becomes unreachable.
+
+### You enforce, and fifty environments already violate the rule.
+
+They keep running, every update to them is rejected, controllers writing their status hot-loop on errors, and
+any with a finalizer become **undeletable** (see [runbook 0004](./runbooks/0004-admission-policy-deadlocks-finalizer.md)).
+A policy meant to prevent bad new things has broken operations on existing ones.
+
+What should happen: survey first, then choose deliberately between fixing them, grandfathering with an
+`oldObject` transition rule, or accepting the breakage. Usually the transition rule, because it separates two
+things that shouldn't be conflated — **enforcement stops the bleeding; remediation is a tracked workstream
+with its own timeline.** Big-bang enforcement merges them and breaks someone's Friday.
+
+The audit phase should produce the burn-down list, not just confidence that the rule works.
+
+### The same ceilings exist in `platform-api` and in the policy ConfigMap. Which wins?
+
+The ConfigMap, because it can't be bypassed. The API's table isn't a second source of truth — it's a *preview*
+of the rule, existing for a better message delivered earlier. Same relationship as client-side form validation
+to server-side.
+
+Drift matters **asymmetrically**, which is the useful part:
+
+- API **stricter** than policy → teams refused something that would have been allowed. Annoying, safe.
+- API **laxer** than policy → the API opens a PR, it merges, and Argo CD can't apply it. The failure moves from request-time to sync-time, far from the developer, leaving a merged commit that can't be applied.
+
+A single source is achievable: have `platform-api` read the same ConfigMap at startup instead of hardcoding a
+table. Failing that, a CI test asserting they match costs nothing. What doesn't work is relying on someone
+remembering to update both.
+
+### Why can't the policy enforce "this team's total budget across all environments"?
+
+CEL in admission is deliberately sandboxed — no cluster reads, no external calls, no state. Every evaluation
+sits in the hot path of every write and must be fast, deterministic and side-effect free. Allowing
+cross-resource queries would make admission a distributed query engine on the critical path, and it'd still be
+wrong: two simultaneous requests would both see the pre-request total.
+
+Three homes, with different properties. `platform-api` can compute it (cluster access, good errors) but is
+bypassable. A webhook could, buying back availability risk. Or — the interesting option — **a controller
+materialises it**: it watches Environments, maintains a per-team object with `status.usedCPU`, and the
+policy's `paramRef` selects that object. Admission then does a local comparison against a precomputed value.
+You've turned a cross-resource query into a param lookup.
+
+It's best-effort rather than transactional, since the materialised total lags. That's acceptable because the
+controller reconciles the truth afterwards. **Admission prevents the obvious cases; reconciliation catches the
+races.**
+
 ## Gaps to be honest about
 
 - No production-scale operational experience *with this specific stack* — compensate by being precise about what you built vs. designed. Never imply the designed parts are running.

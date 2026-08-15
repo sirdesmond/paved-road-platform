@@ -47,10 +47,10 @@ doesn't pass, don't move on. Debugging a small thing now beats debugging a large
 | # | Example | Mode |
 |---|---|---|
 | **10** | [`platform-api`: validate, render, open a PR](./10-platform-api.md) | worked |
-| 11 | `platformctl`: the CLI over the same contract | solo |
-| 12 | Terraform: VPC, EKS and IRSA, with teardown | worked |
-| 13 | Multi-account and the second region | faded |
-| 14 | SLOs, alerts and a runbook that gets used | faded |
+| **11** | [`platformctl`, the same contract from a terminal](./11-platformctl.md) | worked |
+| 12 | Terraform: VPC, EKS and IRSA, with teardown | worked | *not written — costs money, deferred* |
+| 13 | Multi-account and the second region | faded | *not written — depends on 12* |
+| **14** | [SLOs, alerts and a runbook that gets used](./14-slos-and-alerts.md) | worked |
 
 ## One thing to sort out first: no spaces in the path
 

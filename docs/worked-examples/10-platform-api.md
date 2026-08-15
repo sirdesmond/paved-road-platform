@@ -277,6 +277,11 @@ Use a fine-grained PAT scoped to this one repository with contents and pull-requ
 
 ## Step 5: the handler
 
+**File: `internal/api/server.go`** — along with the `Server` type it's a method on, the `Metrics` counter,
+`writeJSON`, and the `Routes()` method below. Keeping the handler and its routing in one file means you can
+see every endpoint the service exposes without opening `main.go`.
+
+
 ```go
 func (s *Server) createEnvironment(w http.ResponseWriter, r *http.Request) {
 	var req api.CreateEnvironmentRequest
@@ -314,13 +319,21 @@ func (s *Server) createEnvironment(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Go 1.22's `net/http` mux handles routing; no framework required:
+Go 1.22's `net/http` mux handles method-aware routing; no framework required. This is a method on `Server`
+in the same file:
 
 ```go
-mux := http.NewServeMux()
-mux.HandleFunc("POST /v1/environments", s.createEnvironment)
-mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
+func (s *Server) Routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/environments", s.createEnvironment)
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
+	return mux
+}
 ```
+
+`cmd/platform-api/main.go` then does nothing but parse flags, read `GITHUB_TOKEN`, construct the server and
+call `http.ListenAndServe(addr, srv.Routes())`. Keeping `main` thin means the interesting code is testable
+without starting a process.
 
 `202 Accepted` is the honest status code. The environment does not exist yet — a PR does.
 
