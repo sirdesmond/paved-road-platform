@@ -3,6 +3,13 @@ kind: PrometheusRule
 metadata:
   name: platform-slos
   namespace: monitoring
+  annotations:
+    # Argo CD dry-runs every resource in a sync before applying any of them.
+    # PrometheusRule's CRD arrives with kube-prometheus-stack, which is itself
+    # installed by this same sync — so without this the dry-run fails on an
+    # unknown kind, the whole sync aborts, and the Application that would have
+    # installed the CRD never gets created. Chicken and egg.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   groups:
     - name: environment-provisioning
